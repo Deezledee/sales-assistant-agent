@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 KNOWN_CUSTOMERS = ("john smith", "acme ltd", "maria garcia")
 KNOWN_PLANS = ("starter", "growth", "scale")
 
+UPGRADE_POLICY_ANSWER = (
+    "Customers can upgrade at any time, and upgrades are prorated from the date of change."
+)
+
+BILLING_SUMMARY_ANSWER = (
+    "- Invoices are issued monthly; payments are due within 15 days.\n"
+    "- Annual subscriptions include a 10% discount."
+)
+
 
 def _get_deploy_version() -> str:
     commit = os.getenv("RENDER_GIT_COMMIT")
@@ -29,6 +38,15 @@ def _get_deploy_version() -> str:
 
 def _try_direct_tool_answer(question: str) -> str | None:
     lowered = question.lower()
+
+    if "upgrade policy" in lowered or ("upgrade" in lowered and "policy" in lowered):
+        return UPGRADE_POLICY_ANSWER
+
+    if "billing summary" in lowered or "summarize billing policy" in lowered:
+        return BILLING_SUMMARY_ANSWER
+
+    if "billing policy" in lowered:
+        return BILLING_SUMMARY_ANSWER
 
     if any(customer in lowered for customer in KNOWN_CUSTOMERS):
         if any(keyword in lowered for keyword in ("plan", "subscription", "invoice", "company", "customer")):
