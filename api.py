@@ -55,6 +55,25 @@ CHAT_HTML = """
                 gap: 10px;
                 background: #fbfbfc;
             }
+            .prompt-list {
+                padding: 12px 12px 0;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .prompt-btn {
+                padding: 6px 10px;
+                border: 1px solid #d1d5db;
+                border-radius: 999px;
+                background: #ffffff;
+                color: #111827;
+                font-size: 12px;
+                cursor: pointer;
+            }
+            .prompt-btn:hover {
+                background: #f3f4f6;
+            }
             .msg {
                 padding: 10px 12px;
                 border-radius: 10px;
@@ -107,6 +126,12 @@ CHAT_HTML = """
         <div class=\"container\">
             <div class=\"card\">
                 <div class=\"header\">Sales Assistant Agent</div>
+                <div class="prompt-list">
+                    <button class="prompt-btn" data-prompt="What plan does John Smith have?">John Smith plan</button>
+                    <button class="prompt-btn" data-prompt="How much is the Growth plan?">Growth pricing</button>
+                    <button class="prompt-btn" data-prompt="What is your upgrade policy?">Upgrade policy</button>
+                    <button class="prompt-btn" data-prompt="Summarize billing policy in 2 bullets.">Billing summary</button>
+                </div>
                 <div id=\"messages\" class=\"messages\"></div>
                 <div class=\"footer\">
                     <input id=\"question\" type=\"text\" placeholder=\"Ask about customer plans, pricing, or policy...\" />
@@ -120,6 +145,7 @@ CHAT_HTML = """
             const messages = document.getElementById('messages');
             const input = document.getElementById('question');
             const sendButton = document.getElementById('send');
+            const promptButtons = document.querySelectorAll('.prompt-btn');
 
             function addMessage(text, role) {
                 const div = document.createElement('div');
@@ -161,6 +187,12 @@ CHAT_HTML = """
             sendButton.addEventListener('click', sendQuestion);
             input.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') sendQuestion();
+            });
+            promptButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    input.value = button.dataset.prompt || '';
+                    input.focus();
+                });
             });
 
             addMessage('Hi! I can answer CRM, pricing, and policy questions.', 'agent');
