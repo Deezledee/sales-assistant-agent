@@ -18,6 +18,16 @@ def get_agent_executor():
     return build_sales_agent(verbose=False)
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "message": "Sales Assistant Agent API is running.",
+        "health": "/health",
+        "ask": "/ask",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
