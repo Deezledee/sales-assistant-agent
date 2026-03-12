@@ -1,6 +1,7 @@
 from functools import lru_cache
+import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from agent import build_sales_agent
@@ -11,6 +12,7 @@ class QuestionRequest(BaseModel):
 
 
 app = FastAPI(title="Sales Assistant Agent API")
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -35,5 +37,12 @@ def health() -> dict[str, str]:
 
 @app.post("/ask")
 def ask(request: QuestionRequest) -> dict[str, str]:
-    response = get_agent_executor().invoke({"input": request.question})
-    return {"answer": response.get("output", "No answer generated.")}
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question must not be empty.")
+
+    try:
+        response = get_agent_executor().invoke({"input": request.question})
+        return {"answer": response.get("output", "No answer generated.")}
+    except Exception as error:
+        logger.exception("Agent execution failed")
+        raise HTTPException(status_code=500, detail=f"Agent execution failed: {error}") from error
