@@ -1,11 +1,12 @@
 from functools import lru_cache
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from agent import build_sales_agent
+from agent import build_sales_agent, get_customer, get_pricing
 
 
 class QuestionRequest(BaseModel):
@@ -14,6 +15,30 @@ class QuestionRequest(BaseModel):
 
 app = FastAPI(title="Sales Assistant Agent API")
 logger = logging.getLogger(__name__)
+
+KNOWN_CUSTOMERS = ("john smith", "acme ltd", "maria garcia")
+KNOWN_PLANS = ("starter", "growth", "scale")
+
+
+def _get_deploy_version() -> str:
+    commit = os.getenv("RENDER_GIT_COMMIT")
+    if not commit:
+        return "local"
+    return commit[:7]
+
+
+def _try_direct_tool_answer(question: str) -> str | None:
+    lowered = question.lower()
+
+    if any(customer in lowered for customer in KNOWN_CUSTOMERS):
+        if any(keyword in lowered for keyword in ("plan", "subscription", "invoice", "company", "customer")):
+            return get_customer(question)
+
+    if any(plan in lowered for plan in KNOWN_PLANS):
+        if any(keyword in lowered for keyword in ("price", "pricing", "cost", "plan", "month", "monthly")):
+            return get_pricing(question)
+
+    return None
 
 CHAT_HTML = """
 <!doctype html>
@@ -26,8 +51,8 @@ CHAT_HTML = """
             body {
                 margin: 0;
                 font-family: Arial, sans-serif;
-                background: #f4f6f8;
-                color: #111827;
+                background: #050b18;
+                color: #e5edff;
             }
             .container {
                 max-width: 800px;
@@ -35,16 +60,18 @@ CHAT_HTML = """
                 padding: 16px;
             }
             .card {
-                background: #ffffff;
+                background: #0b1220;
                 border-radius: 12px;
-                box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
+                border: 1px solid #1b2b49;
+                box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
                 overflow: hidden;
             }
             .header {
                 padding: 16px;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 1px solid #1b2b49;
                 font-size: 18px;
                 font-weight: 700;
+                color: #f8fbff;
             }
             .messages {
                 height: 460px;
@@ -53,26 +80,26 @@ CHAT_HTML = """
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
-                background: #fbfbfc;
+                background: #0a1326;
             }
             .prompt-list {
                 padding: 12px 12px 0;
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 1px solid #1b2b49;
             }
             .prompt-btn {
                 padding: 6px 10px;
-                border: 1px solid #d1d5db;
+                border: 1px solid #2a4a82;
                 border-radius: 999px;
-                background: #ffffff;
-                color: #111827;
+                background: #0f1f3d;
+                color: #dbeafe;
                 font-size: 12px;
                 cursor: pointer;
             }
             .prompt-btn:hover {
-                background: #f3f4f6;
+                background: #1c3568;
             }
             .msg {
                 padding: 10px 12px;
@@ -83,33 +110,41 @@ CHAT_HTML = """
             }
             .user {
                 align-self: flex-end;
-                background: #2563eb;
+                background: #1d4ed8;
                 color: #fff;
             }
             .agent {
                 align-self: flex-start;
-                background: #e5e7eb;
+                background: #16243d;
+                border: 1px solid #27406b;
+                color: #eff6ff;
             }
             .footer {
                 padding: 12px;
-                border-top: 1px solid #e5e7eb;
+                border-top: 1px solid #1b2b49;
                 display: flex;
                 gap: 8px;
             }
             input {
                 flex: 1;
                 padding: 10px;
-                border: 1px solid #d1d5db;
+                border: 1px solid #27406b;
                 border-radius: 8px;
                 font-size: 14px;
+                background: #0f1a31;
+                color: #e5edff;
+            }
+            input::placeholder {
+                color: #9ab0d6;
             }
             button {
                 padding: 10px 14px;
                 border: none;
                 border-radius: 8px;
-                background: #111827;
+                background: #2563eb;
                 color: #fff;
                 cursor: pointer;
+                font-weight: 600;
             }
             button:disabled {
                 opacity: 0.6;
@@ -117,8 +152,13 @@ CHAT_HTML = """
             }
             .hint {
                 font-size: 12px;
-                color: #6b7280;
+                color: #9ab0d6;
                 margin-top: 8px;
+            }
+            .version {
+                margin-top: 8px;
+                font-size: 11px;
+                color: #7d97c4;
             }
         </style>
     </head>
@@ -139,6 +179,7 @@ CHAT_HTML = """
                 </div>
             </div>
             <div class=\"hint\">Examples: \"What plan does John Smith have?\", \"How much is the Growth plan?\"</div>
+            <div class=\"version\">Deploy version: __VERSION__</div>
         </div>
 
         <script>
@@ -212,6 +253,7 @@ def get_agent_executor():
 def root() -> dict[str, str]:
     return {
         "message": "Sales Assistant Agent API is running.",
+        "version": _get_deploy_version(),
         "health": "/health",
         "ask": "/ask",
         "docs": "/docs",
@@ -219,9 +261,14 @@ def root() -> dict[str, str]:
     }
 
 
+@app.get("/version")
+def version() -> dict[str, str]:
+    return {"version": _get_deploy_version()}
+
+
 @app.get("/chat", response_class=HTMLResponse)
 def chat() -> str:
-    return CHAT_HTML
+    return CHAT_HTML.replace("__VERSION__", _get_deploy_version())
 
 
 @app.get("/health")
@@ -235,6 +282,10 @@ def ask(request: QuestionRequest) -> dict[str, str]:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
 
     try:
+        direct_answer = _try_direct_tool_answer(request.question)
+        if direct_answer is not None:
+            return {"answer": direct_answer}
+
         response = get_agent_executor().invoke({"input": request.question})
         return {"answer": response.get("output", "No answer generated.")}
     except Exception as error:
