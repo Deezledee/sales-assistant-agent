@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,37 @@ PRICING_DATA = {
     "growth": "€49/month",
     "scale": "€99/month",
 }
+
+
+def _normalize_text(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    return " ".join(normalized.split())
+
+
+def _find_customer_key(raw_input: str) -> str | None:
+    direct_key = raw_input.strip().lower()
+    if direct_key in CRM_DATA:
+        return direct_key
+
+    normalized_input = _normalize_text(raw_input)
+    for customer_key in CRM_DATA:
+        if _normalize_text(customer_key) in normalized_input:
+            return customer_key
+
+    return None
+
+
+def _find_plan_key(raw_input: str) -> str | None:
+    direct_key = raw_input.strip().lower()
+    if direct_key in PRICING_DATA:
+        return direct_key
+
+    normalized_input = _normalize_text(raw_input)
+    for plan_key in PRICING_DATA:
+        if _normalize_text(plan_key) in normalized_input:
+            return plan_key
+
+    return None
 
 
 class SimpleRAGRetriever:
@@ -81,10 +113,14 @@ class SimpleRAGRetriever:
 
 
 def get_customer(customer_name: str) -> str:
-    key = customer_name.strip().lower()
-    customer = CRM_DATA.get(key)
+    key = _find_customer_key(customer_name)
+    customer = CRM_DATA.get(key) if key else None
     if customer is None:
-        return f"No customer found for '{customer_name}'."
+        available_customers = ", ".join(name.title() for name in CRM_DATA)
+        return (
+            f"No customer found for '{customer_name}'. "
+            f"Available customers: {available_customers}."
+        )
 
     return (
         f"Company: {customer['company']}; "
@@ -94,13 +130,13 @@ def get_customer(customer_name: str) -> str:
 
 
 def get_pricing(plan_name: str) -> str:
-    key = plan_name.strip().lower()
-    price = PRICING_DATA.get(key)
+    key = _find_plan_key(plan_name)
+    price = PRICING_DATA.get(key) if key else None
     if price is None:
         available = ", ".join(plan.title() for plan in PRICING_DATA)
         return f"Unknown plan '{plan_name}'. Available plans: {available}."
 
-    return f"The {plan_name.title()} plan costs {price}."
+    return f"The {key.title()} plan costs {price}."
 
 
 def build_sales_agent(verbose: bool = True):
