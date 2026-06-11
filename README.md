@@ -2,6 +2,11 @@
 
 An AI-powered sales assistant built with **Python**, **LangChain**, and the **OpenAI API**. The agent uses a ReAct tool-calling architecture to dynamically answer customer questions by routing across multiple tools and a RAG-based knowledge base.
 
+## Quick links
+
+- [Docs](https://sales-assistant-agent.onrender.com/docs)
+- [Chat](https://sales-assistant-agent.onrender.com/chat)
+
 ## Features
 
 - **CRM lookup** — retrieve customer information by name
